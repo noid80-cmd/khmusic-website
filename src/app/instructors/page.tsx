@@ -84,6 +84,15 @@ const SubjectIcons: Record<string, JSX.Element> = {
       <path d="M8 8h8M10 16l-3 3M14 16l3 3" />
     </svg>
   ),
+  Rap: (
+    <svg width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="#ffc50a" strokeWidth="1.5">
+      <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+      <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+      <line x1="12" y1="19" x2="12" y2="23" />
+      <line x1="8" y1="23" x2="16" y2="23" />
+      <path d="M4 4l2 2M20 4l-2 2" strokeLinecap="round" />
+    </svg>
+  ),
 };
 
 // Subject name을 URL slug로 변환
@@ -97,6 +106,7 @@ const subjectToSlug: Record<string, string> = {
   Drums: 'drums',
   JazzPiano: 'jazz-piano',
   Dance: 'dance',
+  Rap: 'rap',
 };
 
 // 전공별 설명
@@ -110,6 +120,7 @@ const subjectDescriptions: Record<string, string> = {
   Drums: '드럼 전문 교육',
   JazzPiano: '재즈피아노 및 건반 전문 교육',
   Dance: '무대 퍼포먼스 및 댄스 교육',
+  Rap: '랩/힙합 보컬 전문 교육',
 };
 
 export default function InstructorsPage() {

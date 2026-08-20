@@ -49,6 +49,7 @@ const subjectSlugMap: Record<string, string> = {
   'drums': 'Drums',
   'jazz-piano': 'JazzPiano',
   'dance': 'Dance',
+  'rap': 'Rap',
 };
 
 const subjectTitles: Record<string, { title: string; subtitle: string }> = {
@@ -61,9 +62,10 @@ const subjectTitles: Record<string, { title: string; subtitle: string }> = {
   'drums': { title: '드럼', subtitle: '드럼 전문 교육' },
   'jazz-piano': { title: '재즈피아노', subtitle: '재즈피아노 및 건반 전문 교육' },
   'dance': { title: '댄스', subtitle: '무대 퍼포먼스 및 댄스 교육' },
+  'rap': { title: '랩', subtitle: '랩/힙합 보컬 전문 교육' },
 };
 
-const subjectOrder = ['vocal', 'composing', 'midi', 'singer-songwriter', 'guitar', 'bass', 'drums', 'jazz-piano', 'dance'];
+const subjectOrder = ['vocal', 'composing', 'midi', 'singer-songwriter', 'guitar', 'bass', 'drums', 'jazz-piano', 'dance', 'rap'];
 
 export default function InstructorSubjectPage() {
   const params = useParams();

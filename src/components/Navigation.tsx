@@ -48,6 +48,7 @@ const navLinks: NavLink[] = [
       { name: '드럼', href: '/instructors/drums' },
       { name: '재즈피아노', href: '/instructors/jazz-piano' },
       { name: '댄스', href: '/instructors/dance' },
+      { name: '랩', href: '/instructors/rap' },
     ],
   },
   {
