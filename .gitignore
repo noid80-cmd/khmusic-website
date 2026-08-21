@@ -48,3 +48,7 @@ next-env.d.ts
 # prisma
 prisma/*.db
 prisma/*.db-journal
+
+# Cloudinary 이관 산출물
+cloudinary-migration-map.json
+cloudinary-migration-backup.json
