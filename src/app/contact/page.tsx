@@ -68,8 +68,7 @@ export default function ContactPage() {
               </h3>
               <p style={{ fontSize: '17px', color: '#555', lineHeight: 1.8 }}>
                 평일: 11:00 - 22:00<br />
-                토요일: 11:00 - 19:00<br />
-                일요일/공휴일: 휴무
+                토요일: 11:00 - 19:00
               </p>
             </div>
           </div>
