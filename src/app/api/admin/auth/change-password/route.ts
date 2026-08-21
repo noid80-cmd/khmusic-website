@@ -6,7 +6,7 @@ import bcrypt from 'bcryptjs';
 export async function POST(request: NextRequest) {
   const session = await getSession();
 
-  if (!session?.adminId) {
+  if (!session?.id) {
     return NextResponse.json({ error: '인증이 필요합니다.' }, { status: 401 });
   }
 
@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
 
   // 현재 관리자 정보 조회
   const admin = await prisma.admin.findUnique({
-    where: { id: session.adminId },
+    where: { id: session.id },
   });
 
   if (!admin) {
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
   // 새 비밀번호 해시화 및 업데이트
   const hashedPassword = await bcrypt.hash(newPassword, 12);
   await prisma.admin.update({
-    where: { id: session.adminId },
+    where: { id: session.id },
     data: { password: hashedPassword },
   });
 
