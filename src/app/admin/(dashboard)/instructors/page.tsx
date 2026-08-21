@@ -346,13 +346,13 @@ export default function InstructorsPage() {
   };
 
   // 강사를 전공별로 그룹화 (한 강사가 여러 전공에 나타날 수 있음)
+  // 강사가 아직 없는 전공도 섹션 자체는 보여서 관리자가 등록할 수 있어야 하므로
+  // 빈 그룹을 필터링하지 않는다.
   const groupedInstructors = subjects.reduce((acc, subject) => {
     const subjectInstructors = instructors.filter(instructor =>
       instructor.subjects.some(s => s.subjectId === subject.id)
     );
-    if (subjectInstructors.length > 0) {
-      acc[subject.nameKo] = subjectInstructors;
-    }
+    acc[subject.nameKo] = subjectInstructors;
     return acc;
   }, {} as Record<string, Instructor[]>);
 
