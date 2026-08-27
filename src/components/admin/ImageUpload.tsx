@@ -12,6 +12,50 @@ interface ImageUploadProps {
   compact?: boolean;
 }
 
+// Vercel 서버리스 함수의 요청 본문 한도는 4.5MB다. 그 한도를 넘으면 요청이
+// 핸들러에 닿기도 전에 Vercel이 JSON이 아닌 평문 413을 돌려주므로,
+// 업로드 전에 브라우저에서 미리 줄인다. (요즘 폰 사진은 대부분 이 한도를 넘는다)
+const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
+const MAX_DIMENSION = 1920;
+const COMPRESS_OVER_BYTES = 1.5 * 1024 * 1024;
+
+function loadImage(file: File): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new window.Image();
+    img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('이미지를 읽을 수 없습니다.')); };
+    img.src = url;
+  });
+}
+
+async function compressImage(file: File): Promise<File> {
+  // GIF는 캔버스를 거치면 애니메이션이 사라진다
+  if (file.type === 'image/gif') return file;
+  if (file.size <= COMPRESS_OVER_BYTES) return file;
+
+  try {
+    const img = await loadImage(file);
+    const scale = Math.min(1, MAX_DIMENSION / Math.max(img.width, img.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(img.width * scale);
+    canvas.height = Math.round(img.height * scale);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return file;
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+    // webp는 투명도를 유지하므로 PNG 로고를 올려도 배경이 검게 변하지 않는다
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, 'image/webp', 0.85)
+    );
+    if (!blob || blob.size >= file.size) return file;
+
+    return new File([blob], file.name.replace(/\.[^.]+$/, '') + '.webp', { type: 'image/webp' });
+  } catch {
+    return file; // 줄이는 데 실패하면 원본 그대로 시도한다
+  }
+}
+
 export default function ImageUpload({
   value,
   onChange,
@@ -25,11 +69,18 @@ export default function ImageUpload({
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleUpload = async (file: File) => {
+  const handleUpload = async (rawFile: File) => {
     setError(null);
     setIsUploading(true);
 
     try {
+      const file = await compressImage(rawFile);
+
+      if (file.size > MAX_UPLOAD_BYTES) {
+        const mb = (file.size / 1024 / 1024).toFixed(1);
+        throw new Error(`이미지 용량이 너무 큽니다 (${mb}MB). 4MB 이하로 줄여서 올려주세요.`);
+      }
+
       const formData = new FormData();
       formData.append('file', file);
       formData.append('folder', folder);
@@ -39,14 +90,25 @@ export default function ImageUpload({
         body: formData,
       });
 
-      const data = await res.json();
-      console.log('Upload response:', res.status, data);
+      // 413처럼 Vercel이 직접 돌려주는 응답은 JSON이 아니다.
+      // 곧바로 res.json()을 부르면 파싱 오류가 진짜 원인을 가린다.
+      const text = await res.text();
+      let data: { url?: string; error?: string };
+      try {
+        data = JSON.parse(text);
+      } catch {
+        throw new Error(
+          res.status === 413
+            ? '이미지 용량이 너무 커서 업로드하지 못했습니다. 더 작은 파일로 올려주세요.'
+            : `업로드 실패 (${res.status}). 잠시 후 다시 시도해주세요.`
+        );
+      }
 
       if (!res.ok) {
         throw new Error(data.error || `업로드 실패 (${res.status})`);
       }
 
-      onChange(data.url);
+      onChange(data.url!);
     } catch (err) {
       setError(err instanceof Error ? err.message : '업로드 실패');
     } finally {
