@@ -15,6 +15,7 @@ const STATIC: [string, number, MetadataRoute.Sitemap[number]['changeFrequency']]
   ['/curriculum/audition', 0.7, 'monthly'],
   ['/curriculum/professional', 0.7, 'monthly'],
   ['/curriculum/hobby', 0.7, 'monthly'],
+  ['/blog', 0.9, 'daily'],
   ['/notice', 0.7, 'weekly'],
   ['/scholarship', 0.7, 'monthly'],
   ['/courses', 0.6, 'monthly'],
@@ -63,6 +64,25 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: 'monthly',
       priority: 0.6,
     });
+  }
+
+  // 블로그 글. 검색 유입을 노리는 페이지라 우선순위를 높게 준다.
+  try {
+    const posts = await prisma.blogPost.findMany({
+      where: { status: 'PUBLISHED' },
+      select: { slug: true, updatedAt: true },
+      orderBy: { publishedAt: 'desc' },
+    });
+    for (const p of posts) {
+      entries.push({
+        url: `${SITE}/blog/${p.slug}`,
+        lastModified: p.updatedAt,
+        changeFrequency: 'monthly',
+        priority: 0.8,
+      });
+    }
+  } catch {
+    // 글이 빠져도 나머지 사이트맵은 유효하다
   }
 
   // 공지 상세는 DB에서. 실패해도 사이트맵 전체가 죽으면 안 되므로 감싼다.

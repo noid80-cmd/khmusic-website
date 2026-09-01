@@ -69,6 +69,7 @@ const navLinks: NavLink[] = [
       { name: '2,3년제대학', href: '/admission-guide?category=UNIVERSITY_2YR' },
       { name: '예고/예중', href: '/admission-guide?category=ART_HIGHSCHOOL' },
       { name: '대학원/편입', href: '/admission-guide?category=GRADUATE' },
+      { name: '입시 칼럼', href: '/blog' },
     ],
   },
   {
