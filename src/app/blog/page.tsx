@@ -13,11 +13,11 @@ export const revalidate = 600;
 export const metadata: Metadata = {
   title: '입시 칼럼',
   description:
-    '실용음악 입시요강 분석과 19년 합격 데이터로 쓰는 글. 부천 경희실용음악학원이 직접 정리합니다.',
+    '대학별 실용음악과 실기 요강 정리와 입시 준비 노하우. 부천경희실용음악학원이 직접 씁니다.',
   alternates: { canonical: '/blog' },
   openGraph: {
     title: '입시 칼럼 | 부천경희실용음악학원',
-    description: '실용음악 입시요강 분석과 19년 합격 데이터로 쓰는 글',
+    description: '대학별 실용음악과 실기 요강 정리와 입시 준비 노하우',
     url: '/blog',
     type: 'website',
   },
@@ -51,7 +51,7 @@ export default async function BlogListPage({
     '@type': 'Blog',
     name: '부천경희실용음악학원 입시 칼럼',
     url: `${SITE_URL}/blog`,
-    description: '실용음악 입시요강 분석과 합격 데이터 기반 칼럼',
+    description: '대학별 실용음악과 실기 요강 정리와 입시 준비 노하우',
     publisher: { '@type': 'Organization', name: '부천경희실용음악학원', url: SITE_URL },
   };
 
@@ -66,8 +66,8 @@ export default async function BlogListPage({
         <p className={styles.eyebrow}>부천경희실용음악학원</p>
         <h1 className={styles.h1}>입시 칼럼</h1>
         <p className={styles.lede}>
-          대학별 실기 요강과 19년간 쌓인 합격 데이터를 근거로 정리합니다.
-          어디서나 볼 수 있는 일반론 대신, 숫자로 확인할 수 있는 것만 씁니다.
+          대학마다 실기 요강이 다릅니다. 무엇을 어떤 순서로 준비해야 하는지,
+          현장에서 쌓은 입시 노하우를 공개합니다.
         </p>
       </header>
 
