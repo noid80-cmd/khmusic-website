@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Script from "next/script";
 import "./globals.css";
 import FloatingCTA from "@/components/FloatingCTA";
+import { SITE_URL } from "@/lib/site";
 
 const GA_ID = "G-NZ3TPJKMQG";
 
@@ -20,7 +21,12 @@ export const metadata: Metadata = {
     address: false,
     telephone: false,
   },
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'),
+  metadataBase: new URL(SITE_URL),
+  // vercel.app 주소로도 같은 사이트가 열리기 때문에, 어느 주소로 들어오든
+  // 대표 주소는 khmusic.co.kr 하나임을 검색엔진에 알린다.
+  alternates: {
+    canonical: './',
+  },
   openGraph: {
     title: '부천경희실용음악학원',
     description: '부천경희실용음악학원 - 전문 실용음악 교육기관',
@@ -32,6 +38,16 @@ export const metadata: Metadata = {
   robots: {
     index: true,
     follow: true,
+  },
+  // 네이버 서치어드바이저 / 구글 서치콘솔 소유확인 코드.
+  // 각 사이트에서 발급받아 Vercel 환경변수에 넣으면 자동으로 붙는다.
+  verification: {
+    ...(process.env.NEXT_PUBLIC_GOOGLE_VERIFICATION
+      ? { google: process.env.NEXT_PUBLIC_GOOGLE_VERIFICATION }
+      : {}),
+    ...(process.env.NEXT_PUBLIC_NAVER_VERIFICATION
+      ? { other: { 'naver-site-verification': process.env.NEXT_PUBLIC_NAVER_VERIFICATION } }
+      : {}),
   },
 };
 
