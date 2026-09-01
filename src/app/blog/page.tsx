@@ -67,7 +67,7 @@ export default async function BlogListPage({
         <h1 className={styles.h1}>입시 칼럼</h1>
         <p className={styles.lede}>
           대학마다 실기 요강이 다릅니다. 무엇을 어떤 순서로 준비해야 하는지,
-          현장에서 쌓은 입시 노하우를 공개합니다.
+          어디에서도 볼 수 없는 입시 노하우를 공개합니다.
         </p>
       </header>
 
