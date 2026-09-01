@@ -208,7 +208,8 @@ export default function BlogAdminPage() {
             color: '#7a5d00',
           }}
         >
-          검토를 기다리는 초안이 <b>{draftCount}건</b> 있습니다. 읽어보고 게시하거나 삭제해 주세요.
+          검토를 기다리는 초안이 <b>{draftCount}건</b> 있습니다.{' '}
+          <b>미리보기</b>로 실제 보이는 모습을 확인한 뒤 게시하거나 삭제해 주세요.
         </div>
       )}
 
@@ -281,16 +282,14 @@ export default function BlogAdminPage() {
               </div>
 
               <div style={{ display: 'flex', gap: '6px', flex: 'none' }}>
-                {p.status === 'PUBLISHED' && (
-                  <a
-                    href={`/blog/${p.slug}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={btn}
-                  >
-                    보기
-                  </a>
-                )}
+                <a
+                  href={p.status === 'PUBLISHED' ? `/blog/${p.slug}` : `/blog/preview/${p.id}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={p.status === 'PUBLISHED' ? btn : { ...btn, borderColor: '#111', color: '#111' }}
+                >
+                  {p.status === 'PUBLISHED' ? '보기' : '미리보기'}
+                </a>
                 <button onClick={() => openEdit(p)} style={btn}>
                   수정
                 </button>
