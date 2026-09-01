@@ -102,7 +102,12 @@ model Admission {
   department   String   // 학과
   year         Int      // 합격 연도
   major        String?  // 전공 (보컬, 피아노 등)
-  isEarlyAdmission Boolean @default(false) // 수시/정시 구분
+  // university 한 칸에 학교명·수시정시·합격단계가 섞여 있어 집계가 불가능했다.
+  // 학교명만 university에 남기고 나머지를 아래 두 컬럼으로 분리한다.
+  // 화면 표기는 university + stage를 다시 합쳐 보여주므로 보이는 내용은 그대로다.
+  stage        String?  // 1차합격 / 1단계합격 / 예비3 / 수석 등. null이면 최종합격
+  admissionType String? // 수시 / 정시. 원본에 표기가 있던 건만 채운다(대부분 불명)
+  isEarlyAdmission Boolean @default(false) // 수시/정시 구분 (기존 필드, 신뢰도 낮음)
   photoUrl     String?  // 합격 인증 사진
   testimonial  String?  @db.Text // 합격 후기
   order        Int      @default(0)

@@ -52,3 +52,6 @@ prisma/*.db-journal
 # Cloudinary 이관 산출물
 cloudinary-migration-map.json
 cloudinary-migration-backup.json
+
+# 합격자 데이터 백업 (저장소에 넣지 않음)
+admissions-backup-*.json

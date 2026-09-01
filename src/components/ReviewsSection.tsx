@@ -9,6 +9,7 @@ const PREVIEW_LIMIT = 12;
 interface Student {
   studentName: string;
   university: string;
+  stage: string | null;
   department: string;
   major: string | null;
 }
@@ -53,6 +54,7 @@ export default function ReviewsSection() {
             students: previewStudents.map((a: any) => ({
               studentName: a.studentName,
               university: a.university,
+              stage: a.stage ?? null,
               department: a.department,
               major: a.major || a.department,
             })),
@@ -280,7 +282,7 @@ export default function ReviewsSection() {
                     color: 'rgba(255,255,255,0.6)',
                     fontSize: '14px',
                   }}>
-                    {student.university} · {student.major}
+                    {student.university}{student.stage ? `(${student.stage})` : ''} · {student.major}
                   </p>
                 </div>
               </div>

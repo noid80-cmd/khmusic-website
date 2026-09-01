@@ -6,6 +6,7 @@ import SubPageLayout from '@/components/SubPageLayout';
 interface Student {
   studentName: string;
   university: string;
+  stage: string | null;
   department: string;
   major: string | null;
 }
@@ -47,6 +48,7 @@ export default function AdmissionsPage() {
             students: admissions.map((a: any) => ({
               studentName: a.studentName,
               university: a.university,
+              stage: a.stage ?? null,
               department: a.department,
               major: a.major || a.department,
             })),
@@ -232,7 +234,7 @@ export default function AdmissionsPage() {
                     color: 'rgba(255,255,255,0.6)',
                     fontSize: '14px',
                   }}>
-                    {student.university} · {student.major}
+                    {student.university}{student.stage ? `(${student.stage})` : ''} · {student.major}
                   </p>
                 </div>
               </div>
