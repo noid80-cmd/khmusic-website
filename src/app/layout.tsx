@@ -39,15 +39,17 @@ export const metadata: Metadata = {
     index: true,
     follow: true,
   },
-  // 네이버 서치어드바이저 / 구글 서치콘솔 소유확인 코드.
-  // 각 사이트에서 발급받아 Vercel 환경변수에 넣으면 자동으로 붙는다.
+  // 검색엔진 소유확인 코드. 페이지 소스에 그대로 노출되는 공개 토큰이라
+  // 코드에 두어도 무방하다. 재발급하면 환경변수로 덮을 수 있게 해둔다.
   verification: {
     ...(process.env.NEXT_PUBLIC_GOOGLE_VERIFICATION
       ? { google: process.env.NEXT_PUBLIC_GOOGLE_VERIFICATION }
       : {}),
-    ...(process.env.NEXT_PUBLIC_NAVER_VERIFICATION
-      ? { other: { 'naver-site-verification': process.env.NEXT_PUBLIC_NAVER_VERIFICATION } }
-      : {}),
+    other: {
+      'naver-site-verification':
+        process.env.NEXT_PUBLIC_NAVER_VERIFICATION ||
+        '97bd7c026fd575d5746b319b7cc619f9bd402db7', // 서치어드바이저 발급 2026-09-01
+    },
   },
 };
 
