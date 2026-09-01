@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
+import ImageUpload from '@/components/admin/ImageUpload';
 
 const RichTextEditor = dynamic(() => import('@/components/RichTextEditor'), {
   ssr: false,
@@ -377,7 +378,19 @@ export default function BlogAdminPage() {
               </Field>
             </div>
 
-            <Field label="본문">
+            <Field
+              label="대표 사진"
+              hint="목록과 글 맨 위에 크게 들어갑니다. 카카오톡·네이버로 공유할 때 나오는 썸네일이기도 합니다. 가로로 긴 사진이 좋습니다."
+            >
+              <ImageUpload
+                value={form.coverImage}
+                onChange={(url) => setForm({ ...form, coverImage: url })}
+                folder="blog"
+                placeholder="대표 사진 올리기"
+              />
+            </Field>
+
+            <Field label="본문" hint="글 중간에 사진을 넣으려면 편집기 위쪽의 사진 버튼을 쓰세요.">
               <RichTextEditor
                 content={form.content}
                 onChange={(html: string) => setForm({ ...form, content: html })}

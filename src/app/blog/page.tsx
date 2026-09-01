@@ -93,12 +93,21 @@ export default async function BlogListPage({
           {posts.map((p) => (
             <li key={p.slug} className={styles.item}>
               <Link href={`/blog/${p.slug}`} className={styles.card}>
-                <p className={styles.cat}>{CATEGORY_LABELS[p.category]}</p>
-                <h2 className={styles.title}>{p.title}</h2>
-                <p className={styles.excerpt}>{p.excerpt}</p>
-                <p className={styles.date}>
-                  {p.publishedAt ? formatDate(p.publishedAt) : ''}
-                </p>
+                <div className={styles.cardInner}>
+                  <div className={styles.cardText}>
+                    <p className={styles.cat}>{CATEGORY_LABELS[p.category]}</p>
+                    <h2 className={styles.title}>{p.title}</h2>
+                    <p className={styles.excerpt}>{p.excerpt}</p>
+                    <p className={styles.date}>
+                      {p.publishedAt ? formatDate(p.publishedAt) : ''}
+                    </p>
+                  </div>
+                  {p.coverImage && (
+                    // 관리자가 올린 이미지라 크기를 미리 알 수 없다
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={p.coverImage} alt="" className={styles.thumb} loading="lazy" />
+                  )}
+                </div>
               </Link>
             </li>
           ))}
