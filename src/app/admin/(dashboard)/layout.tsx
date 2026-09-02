@@ -14,6 +14,7 @@ const menuItems = [
   { name: '특별 프로그램', href: '/admin/programs' },
   { name: '공지사항', href: '/admin/notices' },
   { name: '블로그', href: '/admin/blog' },
+  { name: '칼럼 소재', href: '/admin/insights' },
   { name: '합격자 명단', href: '/admin/admissions' },
   { name: '배출 뮤지션', href: '/admin/musicians' },
   { name: '갤러리', href: '/admin/gallery' },

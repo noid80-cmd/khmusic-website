@@ -249,7 +249,7 @@ export async function generateBlogDraft(): Promise<DraftResult> {
   }
 
   // 요강에 없는 현장 지식. 이게 붙어야 요강 재탕이 아닌 글이 된다.
-  const insights = insightsFor(guide.university);
+  const insights = await insightsFor(guide.university);
   const insightBlock = [
     '아래는 요강 문서에 안 적혀 있는데 실제로 준비에 영향을 주는 것들입니다.',
     '요강만 읽어서는 알 수 없는 내용이라, 이 글이 다른 곳과 달라지는 지점입니다.',
