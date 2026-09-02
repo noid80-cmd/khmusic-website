@@ -51,6 +51,13 @@ const SYSTEM = `당신은 실용음악 입시 정보를 정리해 주는 사람�
 - "합격하려면 반드시", "이것만 하면" 같은 보장성 표현과 불안을 자극하는 표현.
 - 다른 학원이나 특정 강사에 대한 언급.
 
+알아두어야 할 배경 (이 분야의 상식입니다. 요강에서 인용한 사실인 것처럼 쓰지 말고, 무엇이 중요한지 판단하는 데만 쓰세요):
+- 실용음악과 입시는 실기 비중이 압도적으로 높습니다. 다만 실기가 전부는 아니고, 전공 실기 외에 면접·즉흥연주·앙상블·악보리딩·청음 등을 함께 보는 학교가 많습니다.
+- 학교마다 뽑는 기준과 선호하는 스타일이 다릅니다. 그래서 "일반적인 준비법"보다 그 학교 요강이 무엇을 요구하는지가 늘 먼저입니다.
+- 정해진 정답을 따라하는 것보다 지원자의 개성과 강점이 드러나는 쪽이 유리합니다.
+- 준비를 일찍 시작할수록 학업과 병행할 여유가 생기고, 늦을수록 선택과 집중이 필요해집니다.
+- 졸업 후 진로는 가수·밴드·싱어송라이터·작곡·편곡·프로듀서·세션·영화음악·방송음악·뮤지컬·게임음악·사운드엔지니어·교육 등으로 넓습니다. 연주자만 되는 학과가 아닙니다.
+
 글의 구조 (기존 글의 결을 따르세요):
 1. 도입 - 어떤 요강이 나왔는지, 어디서 학생들이 걸리는지 두세 문장
 2. 일정 - 원서·실기 날짜를 그대로 인용하고, 그 간격이 준비에 무엇을 의미하는지
@@ -86,10 +93,12 @@ async function gatherContext() {
   const thisYear = new Date().getFullYear();
 
   const [guides, recentPosts] = await Promise.all([
+    // take로 자르면 안 된다. order 값이 전부 0이라 잘린 12개가 사실상 입력 순서로
+    // 정해지고, 그 12개 대학만 평생 반복해서 다루게 된다. 어떤 요강을 쓸지는
+    // pickGuide가 판단하게 두고 여기서는 후보를 다 넘긴다.
     prisma.admissionGuide.findMany({
       where: { isPublished: true, year: { gte: thisYear } },
       orderBy: [{ year: 'desc' }, { order: 'asc' }],
-      take: 12,
     }),
     // 최근에 쓴 글과 주제가 겹치면 안 되므로 제목을 같이 넘긴다.
     prisma.blogPost.findMany({
@@ -103,18 +112,60 @@ async function gatherContext() {
 }
 
 /**
+ * 지망생이 실제로 많이 찾는 순서. 원장 상담 경험에서 나온 순위다.
+ *
+ * 요강은 178개가 있는데 대부분의 학생은 이 중 십여 개만 궁금해한다. 순위 없이
+ * 돌리면 아무도 안 찾는 학교 글이 절반을 차지한다. 앞줄일수록 먼저 다룬다.
+ */
+const POPULAR_UNIVERSITIES = [
+  ['서울예술대학교', '동아방송예술대학교', '호원대학교'],
+  ['서경대학교', '홍익대학교', '한양대학교', '경희대학교'],
+  ['백석예술대학교', '국제예술대학교', '여주대학교', '명지전문대학교'],
+  ['정화예술대학교'], // 최근 지원 문의가 늘고 있는 학교
+];
+
+/** 인기 순위. 목록에 없으면 맨 뒤(=목록 길이)로 보낸다. */
+function popularityRank(university: string): number {
+  const tier = POPULAR_UNIVERSITIES.findIndex((names) =>
+    names.some((name) => university.includes(name)),
+  );
+  return tier === -1 ? POPULAR_UNIVERSITIES.length : tier;
+}
+
+/**
+ * 제목에 쓰일 법한 대학 이름들. DB는 "중앙대학교 수시"로 저장하지만 글 제목은
+ * "중앙대"라고 쓴다. 정식 명칭만 비교하면 방금 쓴 글을 못 알아보고 같은 대학을
+ * 또 고른다.
+ */
+function universityAliases(university: string): string[] {
+  const base = university.replace(/\s*(수시|정시).*$/, '').trim();
+  return [
+    base,
+    base.replace(/여자대학교$/, '여대'),
+    base.replace(/예술대학교$/, '예대'),
+    base.replace(/전문대학교$/, '전문대'),
+    base.replace(/대학교$/, '대'),
+  ];
+}
+
+/**
  * 어떤 요강을 다룰지 고른다.
  *
- * 모델에게 고르게 하면 눈에 띄는 대학만 반복해서 쓴다. 최근 글 제목에 이미
- * 등장한 대학을 뒤로 미뤄서 자연스럽게 돌아가게 한다.
+ * 기준은 두 개다. 먼저 최근 글에 이미 나온 대학을 뒤로 미뤄 주제가 돌아가게 하고,
+ * 그 다음 지망생이 많이 찾는 학교를 앞세운다. 순서가 중요하다 - 인기순을 먼저
+ * 보면 서울예대 글만 계속 나온다.
  */
 function pickGuide<T extends { university: string }>(guides: T[], recentTitles: string[]): T | null {
   if (guides.length === 0) return null;
-  const scored = guides.map((g) => ({
-    guide: g,
-    used: recentTitles.filter((t) => t.includes(g.university)).length,
-  }));
-  scored.sort((a, b) => a.used - b.used);
+  const scored = guides.map((g) => {
+    const aliases = universityAliases(g.university);
+    return {
+      guide: g,
+      used: recentTitles.filter((t) => aliases.some((a) => t.includes(a))).length,
+      rank: popularityRank(g.university),
+    };
+  });
+  scored.sort((a, b) => a.used - b.used || a.rank - b.rank);
   return scored[0].guide;
 }
 
