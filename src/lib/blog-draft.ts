@@ -5,6 +5,7 @@ import prisma from '@/lib/prisma';
 import { makeSlug } from '@/lib/blog';
 import { insightsFor, departmentRank } from '@/lib/blog-knowledge';
 import { checkDraft } from '@/lib/blog-factcheck';
+import { pickTopic } from '@/lib/blog-topics';
 
 /**
  * 입시 칼럼 초안을 자동으로 만든다.
@@ -241,15 +242,18 @@ export async function generateBlogDraft(): Promise<DraftResult> {
 
   const { guides, recentPosts } = await gatherContext();
   const recentTitles = recentPosts.map((p) => p.title);
-  const guide = pickGuide(guides, recentTitles);
+  const topic = pickTopic(guides, recentTitles, pickGuide);
 
-  if (!guide) {
+  if (!topic) {
     // 요강이 없으면 근거가 없다는 뜻이다. 지어내게 두느니 아무것도 안 만든다.
     return { ok: false, reason: '올해 이후 공개된 입시요강이 없어 근거 자료가 부족합니다.' };
   }
 
+  // 기획 글은 학교 한 곳에 매이지 않으므로 학교 지정이 없는 소재만 붙는다.
+  const subject = topic.kind === 'guide' ? topic.guide.university : '';
+
   // 요강에 없는 현장 지식. 이게 붙어야 요강 재탕이 아닌 글이 된다.
-  const insights = await insightsFor(guide.university);
+  const insights = await insightsFor(subject);
   const insightBlock = [
     '아래는 요강 문서에 안 적혀 있는데 실제로 준비에 영향을 주는 것들입니다.',
     '요강만 읽어서는 알 수 없는 내용이라, 이 글이 다른 곳과 달라지는 지점입니다.',
@@ -261,6 +265,32 @@ export async function generateBlogDraft(): Promise<DraftResult> {
       return lines.join('\n');
     }),
   ].join('\n');
+
+  // 글의 종류에 따라 자료를 다르게 넘긴다. 요강 글은 한 건을 통째로 주고,
+  // 기획 글은 여러 요강을 비교용으로 준다. 기획 글에서 요강 한 건을 파고들면
+  // 그건 그냥 요강 글이 되므로, 무엇을 하라는 것인지 명시해야 한다.
+  const topicBlock =
+    topic.kind === 'guide'
+      ? [
+          '## 이번에 다룰 입시요강',
+          JSON.stringify(topic.guide, null, 2),
+          '',
+          '이 요강 한 건을 깊게 다룹니다.',
+        ].join('\n')
+      : [
+          `## 이번 글의 주제`,
+          topic.theme,
+          topic.angle,
+          '',
+          topic.kind === 'crosscut'
+            ? '여러 학교를 가로지르는 글입니다. 한 학교를 깊게 파지 말고, 아래 요강들을 근거로 학교 간 차이를 보여 주세요. 비교는 표로 정리하면 읽기 쉽습니다.'
+            : '특정 요강을 소개하는 글이 아닙니다. 아래 요강들은 사실 확인용 참고 자료일 뿐이니, 필요한 대목에서만 근거로 쓰세요. 지금 이 시기 학생이 실제로 마주하는 상황을 중심으로 씁니다.',
+          '',
+          '## 참고할 요강 자료',
+          JSON.stringify(topic.guides, null, 2),
+          '',
+          '주의: 여기 있는 요강 중에는 원서 접수가 이미 끝난 전형도 있을 수 있습니다. 날짜를 인용할 때 오늘 날짜와 견주어, 이미 지난 일정을 두고 "준비하세요"라고 쓰지 마세요.',
+        ].join('\n');
 
   const client = new Anthropic();
 
@@ -286,13 +316,12 @@ ${todayKST()}
 
 ## 이번 글의 독자
 ${
-  isArtsHighSchool(guide.university)
+  topic.kind === 'guide' && isArtsHighSchool(topic.guide.university)
     ? '예술고등학교 진학을 준비하는 중학생과 학부모입니다. 예고 관련 지침을 따르세요.'
     : '실용음악과 진학을 준비하는 고등학생과 학부모입니다.'
 }
 
-## 이번에 다룰 입시요강
-${JSON.stringify(guide, null, 2)}
+${topicBlock}
 
 ## 요강에는 없지만 확인된 사실
 ${insightBlock}
@@ -321,14 +350,10 @@ ${JSON.stringify(recentTitles, null, 2)}`,
 
   // 지시만으로는 부족하다. 나온 글의 날짜·비율·인원을 요강 원문과 기계적으로 대조해
   // 근거를 못 찾은 값을 남긴다. 자동으로 고치지 않는다 - 사람이 볼 메모다.
-  const sourceText = [
-    guide.content,
-    guide.deadline,
-    guide.examDate,
-    guide.requirements,
-    guide.documents,
-    guide.examContent,
-  ]
+  // 기획 글은 여러 요강을 근거로 쓰므로 그 전부가 대조 대상이다.
+  const usedGuides = topic.kind === 'guide' ? [topic.guide] : topic.guides;
+  const sourceText = usedGuides
+    .flatMap((g) => [g.content, g.deadline, g.examDate, g.requirements, g.documents, g.examContent])
     .filter(Boolean)
     .join(' ');
   const { warnings } = checkDraft(draft.contentHtml, sourceText, todayMonthDayKST());
@@ -345,7 +370,8 @@ ${JSON.stringify(recentTitles, null, 2)}`,
       naverDraft: draft.naverDraft,
       isAutoDraft: true,
       factCheck: warnings.length > 0 ? warnings.join('\n') : null,
-      sourceLink: guide.link ?? null,
+      // 기획 글은 특정 대학 하나로 안 묶여서 링크를 걸 자리가 없다.
+      sourceLink: topic.kind === 'guide' ? topic.guide.link ?? null : null,
       status: 'DRAFT', // 발행은 사람이 검토한 뒤에만
     },
   });
@@ -354,7 +380,7 @@ ${JSON.stringify(recentTitles, null, 2)}`,
     ok: true,
     postId: post.id,
     title: post.title,
-    university: guide.university,
+    university: topic.kind === 'guide' ? topic.guide.university : topic.theme,
     warnings,
   };
 }
