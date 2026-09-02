@@ -668,13 +668,17 @@ export default function AdmissionGuidesPage() {
 
               <div style={{ marginBottom: '16px' }}>
                 <label style={{ display: 'block', fontSize: '14px', fontWeight: 500, marginBottom: '8px' }}>
-                  대학 원서 링크
+                  대학 입시요강 링크
                 </label>
+                <p style={{ fontSize: '12.5px', color: '#888', marginBottom: '8px', lineHeight: 1.6 }}>
+                  해당 대학 입학처나 모집요강 페이지 주소. 연도별 요강 PDF 주소는 해마다 바뀌므로
+                  입학처 주소를 넣는 편이 오래 갑니다.
+                </p>
                 <input
                   type="text"
                   value={formData.link}
                   onChange={(e) => setFormData({ ...formData, link: e.target.value })}
-                  placeholder="https://..."
+                  placeholder="https://ipsi.대학주소.ac.kr"
                   style={{
                     width: '100%',
                     padding: '12px',

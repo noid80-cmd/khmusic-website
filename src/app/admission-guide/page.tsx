@@ -489,7 +489,7 @@ function AdmissionGuideContent() {
                       textDecoration: 'none',
                     }}
                   >
-                    대학 원서 접수 바로가기 →
+                    대학 홈페이지에서 입시요강 확인하기 →
                   </Link>
                 </div>
               )}
