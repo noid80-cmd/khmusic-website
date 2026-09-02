@@ -4,6 +4,7 @@ import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import prisma from '@/lib/prisma';
 import { makeSlug } from '@/lib/blog';
 import { insightsFor, departmentRank } from '@/lib/blog-knowledge';
+import { checkDraft } from '@/lib/blog-factcheck';
 
 /**
  * 입시 칼럼 초안을 자동으로 만든다.
@@ -95,6 +96,12 @@ function todayKST(): string {
     timeZone: 'Asia/Seoul',
     dateStyle: 'full',
   }).format(new Date());
+}
+
+/** 오늘 날짜를 `월-일`로. 대조에서 오늘 날짜만은 예외로 둬야 해서 따로 뽑는다. */
+function todayMonthDayKST(): string {
+  const kst = new Date(Date.now() + 9 * 60 * 60 * 1000);
+  return `${kst.getUTCMonth() + 1}-${kst.getUTCDate()}`;
 }
 
 /**
@@ -224,7 +231,7 @@ function pickGuide<T extends { university: string; department?: string | null }>
 }
 
 export type DraftResult =
-  | { ok: true; postId: string; title: string; university: string }
+  | { ok: true; postId: string; title: string; university: string; warnings: string[] }
   | { ok: false; reason: string };
 
 export async function generateBlogDraft(): Promise<DraftResult> {
@@ -312,6 +319,20 @@ ${JSON.stringify(recentTitles, null, 2)}`,
     slug = `${stamped}-${i}`;
   }
 
+  // 지시만으로는 부족하다. 나온 글의 날짜·비율·인원을 요강 원문과 기계적으로 대조해
+  // 근거를 못 찾은 값을 남긴다. 자동으로 고치지 않는다 - 사람이 볼 메모다.
+  const sourceText = [
+    guide.content,
+    guide.deadline,
+    guide.examDate,
+    guide.requirements,
+    guide.documents,
+    guide.examContent,
+  ]
+    .filter(Boolean)
+    .join(' ');
+  const { warnings } = checkDraft(draft.contentHtml, sourceText, todayMonthDayKST());
+
   const post = await prisma.blogPost.create({
     data: {
       slug,
@@ -323,9 +344,17 @@ ${JSON.stringify(recentTitles, null, 2)}`,
       sourceNote: draft.sourceNote,
       naverDraft: draft.naverDraft,
       isAutoDraft: true,
+      factCheck: warnings.length > 0 ? warnings.join('\n') : null,
+      sourceLink: guide.link ?? null,
       status: 'DRAFT', // 발행은 사람이 검토한 뒤에만
     },
   });
 
-  return { ok: true, postId: post.id, title: post.title, university: guide.university };
+  return {
+    ok: true,
+    postId: post.id,
+    title: post.title,
+    university: guide.university,
+    warnings,
+  };
 }

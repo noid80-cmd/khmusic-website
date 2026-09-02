@@ -23,6 +23,8 @@ interface Post {
   sourceNote: string | null;
   naverDraft: string | null;
   isAutoDraft: boolean;
+  factCheck: string | null;
+  sourceLink: string | null;
   status: 'DRAFT' | 'PUBLISHED';
   publishedAt: string | null;
   createdAt: string;
@@ -174,7 +176,13 @@ export default function BlogAdminPage() {
       // JSON이 아니라 플랫폼 오류 페이지라, 바로 res.json()을 부르면 "요청 실패"라는
       // 뭉뚱그린 메시지만 남고 원인을 알 수 없다.
       const body = await res.text();
-      let data: { created?: boolean; title?: string; reason?: string; error?: string };
+      let data: {
+        created?: boolean;
+        title?: string;
+        reason?: string;
+        error?: string;
+        warnings?: string[];
+      };
       try {
         data = JSON.parse(body);
       } catch {
@@ -187,9 +195,15 @@ export default function BlogAdminPage() {
       }
 
       if (data.created) {
+        const warn = data.warnings?.length
+          ? `
+
+[확인 필요]
+${data.warnings.join('\n')}`
+          : '';
         alert(`초안이 만들어졌습니다.
 
-${data.title}
+${data.title}${warn}
 
 목록에서 확인하고 다듬은 뒤 게시하세요.`);
         fetchPosts();
@@ -345,6 +359,41 @@ ${data.reason ?? data.error ?? '알 수 없는 이유'}`);
                   {catLabel(p.category)} · /blog/{p.slug}
                   {p.publishedAt && ` · ${new Date(p.publishedAt).toLocaleDateString('ko-KR')}`}
                 </p>
+
+                {/* 요강과 대조해서 근거를 못 찾은 값들. 틀렸다는 뜻은 아니고
+                    게시 전에 사람이 눈으로 확인하라는 표시다. */}
+                {p.factCheck && (
+                  <div
+                    style={{
+                      marginTop: '6px',
+                      padding: '8px 10px',
+                      background: '#fff6e5',
+                      border: '1px solid #f0d9a8',
+                      borderRadius: '5px',
+                      fontSize: '12.5px',
+                      color: '#7a5a12',
+                      lineHeight: 1.55,
+                      whiteSpace: 'pre-line',
+                    }}
+                  >
+                    <strong>확인 필요</strong> — 요강 원문에서 근거를 찾지 못한 값입니다.
+                    {'\n'}
+                    {p.factCheck}
+                    {p.sourceLink && (
+                      <>
+                        {'\n'}
+                        <a
+                          href={p.sourceLink}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{ color: '#7a5a12', textDecoration: 'underline' }}
+                        >
+                          대학 공식 요강에서 확인하기 →
+                        </a>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div style={{ display: 'flex', gap: '6px', flex: 'none' }}>

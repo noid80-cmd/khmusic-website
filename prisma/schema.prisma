@@ -342,6 +342,8 @@ model BlogPost {
   sourceNote  String?               // 어떤 데이터를 근거로 썼는지 (글 하단 출처 표기)
   naverDraft  String?      @db.Text // 네이버 블로그에 붙여넣을 버전
   isAutoDraft Boolean      @default(false) // 자동 생성분인지
+  factCheck   String?      @db.Text // 자동 대조에서 근거를 못 찾은 날짜·비율·인원. 비어 있으면 통과
+  sourceLink  String?               // 대조 기준이 된 대학 공식 요강 링크
   status      BlogStatus   @default(DRAFT)
   publishedAt DateTime?
   viewCount   Int          @default(0)
