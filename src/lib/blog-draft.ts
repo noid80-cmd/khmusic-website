@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import prisma from '@/lib/prisma';
 import { makeSlug } from '@/lib/blog';
+import { insightsFor, departmentRank } from '@/lib/blog-knowledge';
 
 /**
  * 입시 칼럼 초안을 자동으로 만든다.
@@ -187,7 +188,10 @@ function universityAliases(university: string): string[] {
  * 그 다음 지망생이 많이 찾는 학교를 앞세운다. 순서가 중요하다 - 인기순을 먼저
  * 보면 서울예대 글만 계속 나온다.
  */
-function pickGuide<T extends { university: string }>(guides: T[], recentTitles: string[]): T | null {
+function pickGuide<T extends { university: string; department?: string | null }>(
+  guides: T[],
+  recentTitles: string[],
+): T | null {
   if (guides.length === 0) return null;
 
   const best = (pool: T[]): T | null => {
@@ -198,9 +202,10 @@ function pickGuide<T extends { university: string }>(guides: T[], recentTitles: 
         guide: g,
         used: recentTitles.filter((t) => aliases.some((a) => t.includes(a))).length,
         rank: popularityRank(g.university),
+        dept: departmentRank(g.department),
       };
     });
-    scored.sort((a, b) => a.used - b.used || a.rank - b.rank);
+    scored.sort((a, b) => a.used - b.used || a.rank - b.rank || a.dept - b.dept);
     return scored[0].guide;
   };
 
@@ -236,6 +241,20 @@ export async function generateBlogDraft(): Promise<DraftResult> {
     return { ok: false, reason: '올해 이후 공개된 입시요강이 없어 근거 자료가 부족합니다.' };
   }
 
+  // 요강에 없는 현장 지식. 이게 붙어야 요강 재탕이 아닌 글이 된다.
+  const insights = insightsFor(guide.university);
+  const insightBlock = [
+    '아래는 요강 문서에 안 적혀 있는데 실제로 준비에 영향을 주는 것들입니다.',
+    '요강만 읽어서는 알 수 없는 내용이라, 이 글이 다른 곳과 달라지는 지점입니다.',
+    '이번 요강과 맞물리는 항목이 있으면 그것을 이 글의 핵심 쟁점으로 삼으세요. 억지로 다 넣지는 마세요.',
+    '',
+    ...insights.map((i) => {
+      const lines = [`- ${i.title}`, `  ${i.detail}`];
+      if (i.caution) lines.push(`  [반드시 함께 안내할 것] ${i.caution}`);
+      return lines.join('\n');
+    }),
+  ].join('\n');
+
   const client = new Anthropic();
 
   const response = await client.messages.parse({
@@ -267,6 +286,9 @@ ${
 
 ## 이번에 다룰 입시요강
 ${JSON.stringify(guide, null, 2)}
+
+## 요강에는 없지만 확인된 사실
+${insightBlock}
 
 ## 최근에 이미 쓴 글 제목 (주제가 겹치지 않게)
 ${JSON.stringify(recentTitles, null, 2)}`,
