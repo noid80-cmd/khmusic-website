@@ -15,6 +15,11 @@ import { makeSlug } from '@/lib/blog';
 
 const DraftSchema = z.object({
   title: z.string().describe('35자 이내. 대학명과 핵심 쟁점이 드러나게'),
+  slug: z
+    .string()
+    .describe(
+      'URL용 영문 슬러그. 소문자 영문·숫자·하이픈만. 대학명 로마자 + 학년도 + 주제 (예: chungang-2027-vocal-free-song). 한글 금지',
+    ),
   excerpt: z.string().describe('120~180자. 목록 요약 겸 meta description'),
   contentHtml: z
     .string()
@@ -36,6 +41,7 @@ const SYSTEM = `당신은 실용음악 입시 정보를 정리해 주는 사람�
 반드시 지킬 것:
 - 제공된 자료(JSON)에 실제로 적힌 사실만 씁니다. 날짜·전형명·실기 조건·모집 인원을 추측하거나 보완하지 마세요.
 - 자료에 없는 정보가 필요하면 그 대목을 아예 쓰지 말고, 다른 각도로 씁니다.
+- 시간 표현은 반드시 아래에 주어진 "오늘 날짜"를 기준으로 씁니다. 이미 지난 달을 두고 "OO월 안에 정하세요"처럼 쓰면 글이 통째로 틀립니다. 남은 기간을 셀 때도 오늘부터 셉니다.
 - 요강은 바뀔 수 있으므로 sourceNote에 출처와 "지원 전 대학 공식 발표 확인" 안내를 넣습니다.
 - 불확실한 것은 불확실하다고 씁니다. 단정하지 마세요.
 
@@ -63,6 +69,17 @@ naverDraft (네이버 블로그용):
 - HTML 태그 없는 평문. 문단을 짧게 끊고 줄바꿈을 자주 씁니다.
 - 목록은 · 또는 ▪ 로, 구분선은 ━━━━━━━━━━ 로 표시합니다.
 - 본문과 같은 사실을 다루되, 더 대화하듯 풀어 씁니다.`;
+
+/**
+ * 서버가 UTC로 돌기 때문에 그냥 new Date()를 넘기면 한국 기준으로 하루가 밀린다.
+ * 입시 글은 "며칠 남았다"가 핵심이라 이 하루가 그대로 오류가 된다.
+ */
+function todayKST(): string {
+  return new Intl.DateTimeFormat('ko-KR', {
+    timeZone: 'Asia/Seoul',
+    dateStyle: 'full',
+  }).format(new Date());
+}
 
 /** 모델에 넘길 근거 자료를 DB에서 모은다. */
 async function gatherContext() {
@@ -137,6 +154,10 @@ export async function generateBlogDraft(): Promise<DraftResult> {
         role: 'user',
         content: `아래 자료만 근거로 입시 칼럼 한 편을 써 주세요.
 
+## 오늘 날짜 (한국 시간)
+${todayKST()}
+이 글은 오늘 발행됩니다. "언제까지 무엇을 하라"는 조언은 전부 이 날짜 이후여야 합니다.
+
 ## 이번에 다룰 입시요강
 ${JSON.stringify(guide, null, 2)}
 
@@ -151,10 +172,15 @@ ${JSON.stringify(recentTitles, null, 2)}`,
     return { ok: false, reason: '모델 응답을 스키마로 해석하지 못했습니다.' };
   }
 
-  // 슬러그 충돌은 URL을 깨뜨리므로 비어 있는 자리를 찾아 붙인다(관리자 저장 로직과 동일).
-  let slug = makeSlug(draft.title);
+  // 제목이 한글이라 제목으로 슬러그를 만들면 영문자가 다 걸러져 `2027-1-1` 같은 URL이
+  // 남는다. 그래서 모델에게 영문 슬러그를 따로 받고, 그게 망가졌을 때만 제목으로 돌아간다.
+  const base = /[a-z0-9]/i.test(draft.slug) ? draft.slug : draft.title;
+
+  // 슬러그 충돌은 URL을 깨뜨리므로 비어 있는 자리를 찾아 붙인다.
+  const stamped = makeSlug(base);
+  let slug = stamped;
   for (let i = 2; await prisma.blogPost.findUnique({ where: { slug } }); i++) {
-    slug = `${slug.replace(/-\d+$/, '')}-${i}`;
+    slug = `${stamped}-${i}`;
   }
 
   const post = await prisma.blogPost.create({
