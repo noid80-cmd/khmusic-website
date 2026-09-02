@@ -319,16 +319,10 @@
 /* 상담 유도 */
 .cta {
   margin-top: 56px;
-  padding: 32px;
+  padding: 24px;
   background: var(--bg-light);
   border-radius: 8px;
-}
-
-.cta p {
-  font-size: 16px;
-  line-height: 1.75;
-  color: var(--text-gray);
-  margin-bottom: 18px;
+  text-align: center;
 }
 
 .ctaBtn {

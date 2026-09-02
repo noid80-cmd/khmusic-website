@@ -1,0 +1,176 @@
+import Anthropic from '@anthropic-ai/sdk';
+import { z } from 'zod';
+import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
+import prisma from '@/lib/prisma';
+import { makeSlug } from '@/lib/blog';
+
+/**
+ * 입시 칼럼 초안을 자동으로 만든다.
+ *
+ * 설계에서 가장 중요한 제약: **DB에 실제로 있는 요강·합격 데이터만 근거로 쓴다.**
+ * 입시 글은 원서 기간이나 실기 조건을 하나만 잘못 써도 그걸 믿고 준비한 학생이
+ * 생긴다. 그래서 모델에게 자료를 통째로 넘기고 "여기 없는 사실은 쓰지 말라"고
+ * 묶은 뒤, 결과는 반드시 DRAFT로만 저장한다. 발행은 사람이 누른다.
+ */
+
+const DraftSchema = z.object({
+  title: z.string().describe('35자 이내. 대학명과 핵심 쟁점이 드러나게'),
+  excerpt: z.string().describe('120~180자. 목록 요약 겸 meta description'),
+  contentHtml: z
+    .string()
+    .describe(
+      '본문 HTML. h2/h3/p/ul/ol/li/strong/em/blockquote/table/thead/tbody/tr/th/td만 사용. h1과 style/script/class 속성 금지',
+    ),
+  keywords: z.array(z.string()).describe('검색 키워드 5~8개'),
+  sourceNote: z.string().describe('어떤 자료를 근거로 썼는지와 변경 가능성 안내'),
+  naverDraft: z.string().describe('네이버 블로그에 붙여넣을 평문 버전(HTML 태그 없이)'),
+});
+
+export type BlogDraft = z.infer<typeof DraftSchema>;
+
+const SYSTEM = `당신은 실용음악 입시 정보를 정리해 주는 사람입니다.
+독자는 실용음악과 진학을 준비하는 고등학생과 학부모입니다.
+
+이 글의 목적은 하나입니다: 요강을 읽어도 알기 어려운 부분을 풀어 주고, 그래서 무엇을 어떻게 준비하면 되는지 알려주는 것.
+
+반드시 지킬 것:
+- 제공된 자료(JSON)에 실제로 적힌 사실만 씁니다. 날짜·전형명·실기 조건·모집 인원을 추측하거나 보완하지 마세요.
+- 자료에 없는 정보가 필요하면 그 대목을 아예 쓰지 말고, 다른 각도로 씁니다.
+- 요강은 바뀔 수 있으므로 sourceNote에 출처와 "지원 전 대학 공식 발표 확인" 안내를 넣습니다.
+- 불확실한 것은 불확실하다고 씁니다. 단정하지 마세요.
+
+쓰지 말 것:
+- 학원 이름, 학원 홍보, 상담이나 수강 유도 문구. 한 문장도 넣지 마세요.
+- 합격 실적, 배출 인원, 합격자 사례, "우리는/저희는" 같은 표현.
+- "합격하려면 반드시", "이것만 하면" 같은 보장성 표현과 불안을 자극하는 표현.
+- 다른 학원이나 특정 강사에 대한 언급.
+
+글의 구조 (기존 글의 결을 따르세요):
+1. 도입 - 어떤 요강이 나왔는지, 어디서 학생들이 걸리는지 두세 문장
+2. 일정 - 원서·실기 날짜를 그대로 인용하고, 그 간격이 준비에 무엇을 의미하는지
+3. 조건 정리 - 전공별 실기 내용처럼 비교할 게 있으면 표(table)로
+4. 핵심 쟁점 하나 - 학생이 가장 많이 놓치는 조건 하나를 골라 왜 문제가 되는지 깊게. 이 글의 중심입니다
+5. 확인할 것 - 곡 선택 기준이나 준비 순서를 목록(ul)으로
+6. 정리 - 이 글에서 기억할 한 줄
+
+문체:
+- 요강을 그대로 옮기지 않습니다. 학생이 놓치기 쉬운 조건을 짚고, 그것 때문에 준비 순서가 어떻게 달라지는지를 설명합니다.
+- 읽고 나서 바로 할 수 있는 것이 남아야 합니다.
+- 1200~1800자. 담백한 존댓말. 감탄사와 과장된 수식어를 쓰지 않습니다.
+- 마지막을 상담 권유나 마무리 인사로 끝내지 마세요. 페이지 하단에 상담 예약 버튼이 따로 붙습니다. 본문은 정보로 끝냅니다.
+
+naverDraft (네이버 블로그용):
+- HTML 태그 없는 평문. 문단을 짧게 끊고 줄바꿈을 자주 씁니다.
+- 목록은 · 또는 ▪ 로, 구분선은 ━━━━━━━━━━ 로 표시합니다.
+- 본문과 같은 사실을 다루되, 더 대화하듯 풀어 씁니다.`;
+
+/** 모델에 넘길 근거 자료를 DB에서 모은다. */
+async function gatherContext() {
+  const thisYear = new Date().getFullYear();
+
+  const [guides, recentPosts] = await Promise.all([
+    prisma.admissionGuide.findMany({
+      where: { isPublished: true, year: { gte: thisYear } },
+      orderBy: [{ year: 'desc' }, { order: 'asc' }],
+      take: 12,
+    }),
+    // 최근에 쓴 글과 주제가 겹치면 안 되므로 제목을 같이 넘긴다.
+    prisma.blogPost.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+      select: { title: true, createdAt: true },
+    }),
+  ]);
+
+  return { guides, recentPosts };
+}
+
+/**
+ * 어떤 요강을 다룰지 고른다.
+ *
+ * 모델에게 고르게 하면 눈에 띄는 대학만 반복해서 쓴다. 최근 글 제목에 이미
+ * 등장한 대학을 뒤로 미뤄서 자연스럽게 돌아가게 한다.
+ */
+function pickGuide<T extends { university: string }>(guides: T[], recentTitles: string[]): T | null {
+  if (guides.length === 0) return null;
+  const scored = guides.map((g) => ({
+    guide: g,
+    used: recentTitles.filter((t) => t.includes(g.university)).length,
+  }));
+  scored.sort((a, b) => a.used - b.used);
+  return scored[0].guide;
+}
+
+export type DraftResult =
+  | { ok: true; postId: string; title: string; university: string }
+  | { ok: false; reason: string };
+
+export async function generateBlogDraft(): Promise<DraftResult> {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return { ok: false, reason: 'ANTHROPIC_API_KEY가 설정돼 있지 않습니다.' };
+  }
+
+  const { guides, recentPosts } = await gatherContext();
+  const recentTitles = recentPosts.map((p) => p.title);
+  const guide = pickGuide(guides, recentTitles);
+
+  if (!guide) {
+    // 요강이 없으면 근거가 없다는 뜻이다. 지어내게 두느니 아무것도 안 만든다.
+    return { ok: false, reason: '올해 이후 공개된 입시요강이 없어 근거 자료가 부족합니다.' };
+  }
+
+  const client = new Anthropic();
+
+  const response = await client.messages.parse({
+    model: 'claude-opus-5',
+    max_tokens: 8000,
+    system: SYSTEM,
+    thinking: { type: 'adaptive' },
+    // Vercel 함수 실행 시간 상한(취미 플랜 60초) 안에 끝내야 해서 effort를 낮춰 잡았다.
+    // 플랜을 올리거나 배치로 돌리게 되면 high로 올리는 게 글 품질에 낫다.
+    output_config: {
+      effort: 'medium',
+      format: zodOutputFormat(DraftSchema),
+    },
+    messages: [
+      {
+        role: 'user',
+        content: `아래 자료만 근거로 입시 칼럼 한 편을 써 주세요.
+
+## 이번에 다룰 입시요강
+${JSON.stringify(guide, null, 2)}
+
+## 최근에 이미 쓴 글 제목 (주제가 겹치지 않게)
+${JSON.stringify(recentTitles, null, 2)}`,
+      },
+    ],
+  });
+
+  const draft = response.parsed_output;
+  if (!draft) {
+    return { ok: false, reason: '모델 응답을 스키마로 해석하지 못했습니다.' };
+  }
+
+  // 슬러그 충돌은 URL을 깨뜨리므로 비어 있는 자리를 찾아 붙인다(관리자 저장 로직과 동일).
+  let slug = makeSlug(draft.title);
+  for (let i = 2; await prisma.blogPost.findUnique({ where: { slug } }); i++) {
+    slug = `${slug.replace(/-\d+$/, '')}-${i}`;
+  }
+
+  const post = await prisma.blogPost.create({
+    data: {
+      slug,
+      title: draft.title,
+      excerpt: draft.excerpt,
+      content: draft.contentHtml,
+      category: 'ADMISSION',
+      keywords: draft.keywords.join(', '),
+      sourceNote: draft.sourceNote,
+      naverDraft: draft.naverDraft,
+      isAutoDraft: true,
+      status: 'DRAFT', // 발행은 사람이 검토한 뒤에만
+    },
+  });
+
+  return { ok: true, postId: post.id, title: post.title, university: guide.university };
+}

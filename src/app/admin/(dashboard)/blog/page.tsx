@@ -162,6 +162,32 @@ export default function BlogAdminPage() {
   const shown = posts.filter((p) => filter === 'ALL' || p.status === filter);
   const draftCount = posts.filter((p) => p.status === 'DRAFT').length;
 
+  const [generating, setGenerating] = useState(false);
+
+  // 글 한 편을 쓰는 데 수십 초가 걸린다. 눌러놓고 기다릴 수 있게 상태를 보여준다.
+  async function generateDraft() {
+    setGenerating(true);
+    try {
+      const res = await fetch('/api/cron/blog-draft', { method: 'POST' });
+      const data = await res.json();
+      if (data.created) {
+        alert(`초안이 만들어졌습니다.
+
+${data.title}
+
+목록에서 확인하고 다듬은 뒤 게시하세요.`);
+        fetchPosts();
+      } else {
+        alert(`초안을 만들지 못했습니다.
+
+${data.reason ?? data.error ?? '알 수 없는 이유'}`);
+      }
+    } catch {
+      alert('요청이 실패했습니다. 잠시 후 다시 시도해 주세요.');
+    }
+    setGenerating(false);
+  }
+
   return (
     <div style={{ padding: '32px' }}>
       <div
@@ -180,21 +206,42 @@ export default function BlogAdminPage() {
             입시 칼럼 글을 쓰고 게시합니다. 게시하면 khmusic.co.kr/blog 에 바로 올라갑니다.
           </p>
         </div>
-        <button
-          onClick={openNew}
-          style={{
-            padding: '11px 22px',
-            background: '#111',
-            color: '#fff',
-            border: 0,
-            borderRadius: '6px',
-            fontWeight: 600,
-            fontSize: '14px',
-            cursor: 'pointer',
-          }}
-        >
-          새 글 쓰기
-        </button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {/* 예약(월·목)을 기다리지 않고 지금 초안을 받아본다. 결과는 항상 초안이라
+              눌러도 사이트에 바로 올라가지 않는다. */}
+          <button
+            onClick={generateDraft}
+            disabled={generating}
+            style={{
+              padding: '11px 18px',
+              background: '#fff',
+              color: '#111',
+              border: '1px solid #ddd',
+              borderRadius: '6px',
+              fontWeight: 600,
+              fontSize: '14px',
+              cursor: generating ? 'default' : 'pointer',
+              opacity: generating ? 0.6 : 1,
+            }}
+          >
+            {generating ? '쓰는 중... (1분 정도)' : '초안 자동 생성'}
+          </button>
+          <button
+            onClick={openNew}
+            style={{
+              padding: '11px 22px',
+              background: '#111',
+              color: '#fff',
+              border: 0,
+              borderRadius: '6px',
+              fontWeight: 600,
+              fontSize: '14px',
+              cursor: 'pointer',
+            }}
+          >
+            새 글 쓰기
+          </button>
+        </div>
       </div>
 
       {draftCount > 0 && (

@@ -117,13 +117,11 @@ export default async function BlogPostPage({
 
       {post.sourceNote && <p className={styles.source}>{post.sourceNote}</p>}
 
+      {/* 본문은 정보만 담고, 학원으로 이어지는 건 이 버튼 하나뿐이다.
+          홍보 문구를 본문이나 여기에 덧붙이면 글 전체가 광고처럼 읽힌다. */}
       <div className={styles.cta}>
-        <p>
-          궁금한 점이 있으시면 상담을 통해 문의해 주세요.
-          학생의 전공과 목표 대학에 맞춰 준비 방향을 함께 잡아드립니다.
-        </p>
         <Link href="/contact" className={styles.ctaBtn}>
-          상담 문의하기
+          상담 예약하기
         </Link>
       </div>
 
