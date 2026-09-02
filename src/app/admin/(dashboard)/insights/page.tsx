@@ -19,6 +19,12 @@ interface Insight {
   order: number;
 }
 
+interface Suggestion {
+  question: string;
+  why: string;
+  schools: string;
+}
+
 const EMPTY = { title: '', detail: '', caution: '', schools: '', isActive: true, order: 0 };
 
 export default function InsightsPage() {
@@ -27,6 +33,72 @@ export default function InsightsPage() {
   const [editing, setEditing] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
+
+  // 메모를 그대로 받아 칸에 나눠 담는 자리. 양식을 채우게 하면 아무도 안 쓴다.
+  const [memo, setMemo] = useState('');
+  const [structuring, setStructuring] = useState(false);
+  const [memoNote, setMemoNote] = useState('');
+
+  const [suggestions, setSuggestions] = useState<Suggestion[] | null>(null);
+  const [suggesting, setSuggesting] = useState(false);
+
+  /** 메모를 칸에 나눠 담는다. 저장은 사람이 확인한 뒤에 한다. */
+  async function structure() {
+    if (!memo.trim()) {
+      alert('정리할 내용을 먼저 써 주세요.');
+      return;
+    }
+    setStructuring(true);
+    setMemoNote('');
+    try {
+      const res = await fetch('/api/admin/insights/draft', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: memo }),
+      });
+      const body = await res.text();
+      let data: { structured?: typeof EMPTY & { note?: string }; error?: string };
+      try {
+        data = JSON.parse(body);
+      } catch {
+        alert(res.status === 504 ? '시간이 초과됐습니다. 다시 시도해 주세요.' : `서버 오류 (${res.status})`);
+        return;
+      }
+      if (!data.structured) {
+        alert(data.error ?? '정리하지 못했습니다.');
+        return;
+      }
+      const s = data.structured;
+      setForm({
+        title: s.title ?? '',
+        detail: s.detail ?? '',
+        caution: s.caution ?? '',
+        schools: s.schools ?? '',
+        isActive: true,
+        order: 0,
+      });
+      setMemoNote(s.note ?? '');
+      setEditing('new');
+    } finally {
+      setStructuring(false);
+    }
+  }
+
+  async function loadSuggestions() {
+    setSuggesting(true);
+    try {
+      const res = await fetch('/api/admin/insights/draft');
+      const body = await res.text();
+      try {
+        const data = JSON.parse(body);
+        setSuggestions(data.questions ?? []);
+      } catch {
+        alert(res.status === 504 ? '시간이 초과됐습니다. 다시 시도해 주세요.' : `서버 오류 (${res.status})`);
+      }
+    } finally {
+      setSuggesting(false);
+    }
+  }
 
   useEffect(() => {
     fetchInsights();
@@ -47,6 +119,7 @@ export default function InsightsPage() {
 
   function openNew() {
     setForm(EMPTY);
+    setMemoNote('');
     setEditing('new');
   }
 
@@ -81,6 +154,8 @@ export default function InsightsPage() {
         return;
       }
       setEditing(null);
+      setMemo('');
+      setMemoNote('');
       fetchInsights();
     } finally {
       setSaving(false);
@@ -144,23 +219,122 @@ export default function InsightsPage() {
             자동 생성되는 입시 칼럼이 이걸 소재로 씁니다. 쌓일수록 글이 좋아집니다.
           </p>
         </div>
+        <div style={{ display: 'flex', gap: '10px', flex: 'none' }}>
+          <button onClick={loadSuggestions} disabled={suggesting} style={{ ...btn, padding: '12px 18px' }}>
+            {suggesting ? '찾는 중...' : '무엇을 쓸지 모르겠다면'}
+          </button>
+          <button
+            onClick={openNew}
+            style={{
+              padding: '12px 24px',
+              background: '#000',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '14px',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            + 직접 입력
+          </button>
+        </div>
+      </div>
+
+      {/* 양식을 채우게 하면 안 쓰게 된다. 아는 걸 그냥 쓰면 칸은 이쪽에서 나눈다. */}
+      <div
+        style={{
+          margin: '20px 0',
+          padding: '20px',
+          border: '1px solid #e2e2e2',
+          borderRadius: '8px',
+          background: '#fafafa',
+        }}
+      >
+        <label style={{ ...label, fontSize: '14px', marginBottom: '4px' }}>
+          아는 대로 쓰기
+        </label>
+        <p style={{ fontSize: '12.5px', color: '#888', marginBottom: '10px', lineHeight: 1.6 }}>
+          형식 신경 쓰지 말고 메모하듯 쓰시면 제목·설명·해당 학교로 나눠 드립니다. 저장 전에
+          확인하실 수 있습니다. 쓰신 내용에 없는 사실은 채우지 않습니다.
+        </p>
+        <textarea
+          style={{ ...input, minHeight: '96px', resize: 'vertical' }}
+          value={memo}
+          onChange={(e) => setMemo(e.target.value)}
+          placeholder={
+            '예) 서울예대는 1차랑 2차 곡이 달라야 함. 같은 곡 또 부르면 감점은 아닌데 ' +
+            '심사위원이 기억해서 좋을 게 없음. 애들이 이걸 몰라서 1차 곡만 파다가 2차에서 급하게 준비함.'
+          }
+        />
         <button
-          onClick={openNew}
+          onClick={structure}
+          disabled={structuring}
           style={{
-            padding: '12px 24px',
+            marginTop: '10px',
+            padding: '10px 20px',
             background: '#000',
             color: '#fff',
             border: 'none',
-            borderRadius: '8px',
-            fontSize: '14px',
+            borderRadius: '6px',
+            fontSize: '13.5px',
             fontWeight: 600,
-            cursor: 'pointer',
-            flex: 'none',
+            cursor: structuring ? 'default' : 'pointer',
           }}
         >
-          + 소재 추가
+          {structuring ? '정리 중...' : '정리하기'}
         </button>
       </div>
+
+      {suggestions && (
+        <div
+          style={{
+            margin: '20px 0',
+            padding: '20px',
+            border: '1px solid #e2e2e2',
+            borderRadius: '8px',
+            background: '#fff',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+            <strong style={{ fontSize: '15px' }}>요강을 보고 뽑은 질문</strong>
+            <button
+              onClick={() => setSuggestions(null)}
+              style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#888' }}
+            >
+              닫기
+            </button>
+          </div>
+          <p style={{ fontSize: '12.5px', color: '#888', marginBottom: '14px', lineHeight: 1.6 }}>
+            요강만 봐서는 알 수 없는 것들입니다. 답을 아시는 게 있으면 위 칸에 적어 주세요.
+            여기 답은 없습니다 — 추측한 답을 적으면 그게 사실처럼 굳기 때문입니다.
+          </p>
+          {suggestions.length === 0 ? (
+            <p style={{ color: '#999', fontSize: '13.5px' }}>뽑아낸 질문이 없습니다.</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {suggestions.map((s, idx) => (
+                <div
+                  key={idx}
+                  style={{ padding: '13px 15px', border: '1px solid #eee', borderRadius: '6px' }}
+                >
+                  <p style={{ fontSize: '14px', lineHeight: 1.65, marginBottom: '6px' }}>{s.question}</p>
+                  <p style={{ fontSize: '12.5px', color: '#888', lineHeight: 1.6 }}>{s.why}</p>
+                  <button
+                    onClick={() => {
+                      setMemo(`${s.question}\n\n답: `);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    style={{ ...btn, marginTop: '9px', fontSize: '12.5px', padding: '6px 11px' }}
+                  >
+                    이 질문에 답하기
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {editing && (
         <div
@@ -172,6 +346,23 @@ export default function InsightsPage() {
             background: '#fafafa',
           }}
         >
+          {memoNote && (
+            <div
+              style={{
+                marginBottom: '16px',
+                padding: '11px 13px',
+                background: '#fff6e5',
+                border: '1px solid #f0d9a8',
+                borderRadius: '6px',
+                fontSize: '13px',
+                color: '#7a5a12',
+                lineHeight: 1.6,
+              }}
+            >
+              <strong>확인 필요</strong> — {memoNote}
+            </div>
+          )}
+
           <div style={{ marginBottom: '16px' }}>
             <label style={label}>제목 — 한 줄로 요약</label>
             <input
