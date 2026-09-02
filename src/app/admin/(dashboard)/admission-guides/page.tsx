@@ -27,12 +27,116 @@ const categoryLabels: Record<string, string> = {
   GRADUATE: '대학원',
 };
 
+interface AuditIssue {
+  guideId: string;
+  university: string;
+  department: string | null;
+  year: number;
+  severity: 'error' | 'warning';
+  message: string;
+}
+
+interface AuditResult {
+  checked: number;
+  errors: number;
+  warnings: number;
+  issues: AuditIssue[];
+}
+
+/**
+ * 점검 결과.
+ *
+ * "오류 0건"이 요강이 다 맞다는 뜻은 아니다. 앞뒤가 안 맞는 것만 걸러낸 것이고,
+ * 원본 대조는 사람이 해야 한다. 그래서 그 한계를 화면에 같이 적어 둔다.
+ */
+function AuditPanel({ audit, onClose }: { audit: AuditResult; onClose: () => void }) {
+  const errors = audit.issues.filter((i) => i.severity === 'error');
+  const warnings = audit.issues.filter((i) => i.severity === 'warning');
+
+  const row = (i: AuditIssue, idx: number) => (
+    <li key={`${i.guideId}-${idx}`} style={{ marginBottom: '6px', lineHeight: 1.55 }}>
+      <strong style={{ fontWeight: 600 }}>
+        {i.university}
+        {i.department ? ` ${i.department}` : ''}
+      </strong>
+      <span style={{ color: '#666' }}> — {i.message}</span>
+    </li>
+  );
+
+  return (
+    <div
+      style={{
+        marginBottom: '24px',
+        padding: '18px 20px',
+        border: '1px solid #e2e2e2',
+        borderRadius: '8px',
+        background: '#fafafa',
+        fontSize: '13.5px',
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+        <strong style={{ fontSize: '15px' }}>
+          {audit.checked}건 점검 · 오류 {audit.errors} · 확인 {audit.warnings}
+        </strong>
+        <button
+          onClick={onClose}
+          style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#888' }}
+        >
+          닫기
+        </button>
+      </div>
+
+      {errors.length > 0 && (
+        <>
+          <p style={{ fontWeight: 600, color: '#c0392b', margin: '12px 0 6px' }}>
+            오류 — 값 자체가 앞뒤가 안 맞습니다
+          </p>
+          <ul style={{ paddingLeft: '18px' }}>{errors.map(row)}</ul>
+        </>
+      )}
+
+      {warnings.length > 0 && (
+        <>
+          <p style={{ fontWeight: 600, color: '#8a6d1f', margin: '12px 0 6px' }}>
+            확인 — 사람이 봐야 합니다
+          </p>
+          <ul style={{ paddingLeft: '18px' }}>{warnings.map(row)}</ul>
+        </>
+      )}
+
+      {audit.issues.length === 0 && (
+        <p style={{ color: '#2d7a3e', margin: '8px 0' }}>걸린 항목이 없습니다.</p>
+      )}
+
+      <p style={{ marginTop: '14px', color: '#999', fontSize: '12.5px', lineHeight: 1.6 }}>
+        이 점검은 요강끼리 앞뒤가 맞는지만 봅니다. 날짜가 대학 발표와 같은지는 확인하지
+        못하므로, 오류가 없다고 해서 요강이 정확하다는 뜻은 아닙니다.
+      </p>
+    </div>
+  );
+}
+
 export default function AdmissionGuidesPage() {
   const [guides, setGuides] = useState<AdmissionGuide[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingGuide, setEditingGuide] = useState<AdmissionGuide | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [auditing, setAuditing] = useState(false);
+  const [audit, setAudit] = useState<AuditResult | null>(null);
+
+  async function runAudit() {
+    setAuditing(true);
+    try {
+      const res = await fetch('/api/admin/admission-guides/audit');
+      if (!res.ok) throw new Error(String(res.status));
+      setAudit(await res.json());
+    } catch {
+      alert('점검에 실패했습니다. 잠시 후 다시 시도해 주세요.');
+    } finally {
+      setAuditing(false);
+    }
+  }
   const currentYear = new Date().getFullYear();
   const [formData, setFormData] = useState({
     university: '',
@@ -142,22 +246,42 @@ export default function AdmissionGuidesPage() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
         <h1 style={{ fontSize: '28px', fontWeight: 700 }}>입시요강 관리</h1>
-        <button
-          onClick={() => openModal()}
-          style={{
-            padding: '12px 24px',
-            backgroundColor: '#000',
-            color: '#fff',
-            border: 'none',
-            borderRadius: '8px',
-            fontSize: '14px',
-            fontWeight: 600,
-            cursor: 'pointer',
-          }}
-        >
-          + 입시요강 추가
-        </button>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button
+            onClick={runAudit}
+            disabled={auditing}
+            style={{
+              padding: '12px 20px',
+              backgroundColor: '#fff',
+              color: '#111',
+              border: '1px solid #ddd',
+              borderRadius: '8px',
+              fontSize: '14px',
+              fontWeight: 600,
+              cursor: auditing ? 'default' : 'pointer',
+            }}
+          >
+            {auditing ? '점검 중...' : '오류 점검'}
+          </button>
+          <button
+            onClick={() => openModal()}
+            style={{
+              padding: '12px 24px',
+              backgroundColor: '#000',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '14px',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            + 입시요강 추가
+          </button>
+        </div>
       </div>
+
+      {audit && <AuditPanel audit={audit} onClose={() => setAudit(null)} />}
 
       {/* Category Filter */}
       <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', flexWrap: 'wrap' }}>

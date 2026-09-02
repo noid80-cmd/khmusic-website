@@ -71,6 +71,21 @@ export function extractHeadcounts(text: string): Set<string> {
   return found;
 }
 
+/**
+ * 요강 원문에 등장하는 모든 숫자.
+ *
+ * 원문의 표기가 제각각이라 단위까지 맞춰서 비교하면 멀쩡한 값이 경고로 뜬다.
+ * "반영 비율 : 실기 80% + 학생부 20%"라고 쓴 요강이 있고 "실기 80 + 학생부 20"이라고
+ * 쓴 요강이 있으며, 인원도 "모집 인원 : 15명"과 "모집 인원 : 보컬 16"이 섞여 있다.
+ * 그래서 비율과 인원만은 단위를 떼고 숫자가 원문 어딘가에 있는지만 본다.
+ * 날짜는 이렇게 하지 않는다 - 날짜야말로 정확히 봐야 하는 값이다.
+ */
+export function extractNumbers(text: string): Set<string> {
+  const found = new Set<string>();
+  for (const m of text.matchAll(/\d{1,4}/g)) found.add(m[0]);
+  return found;
+}
+
 export type FactCheck = {
   /** 자료에서 근거를 못 찾은 값들. 비어 있으면 대조를 통과한 것이다. */
   warnings: string[];
@@ -99,14 +114,14 @@ export function checkDraft(
     );
   }
 
-  const sourcePercents = extractPercents(sourceText);
-  const unknownPercents = [...extractPercents(draft)].filter((p) => !sourcePercents.has(p));
+  const sourceNumbers = extractNumbers(sourceText);
+
+  const unknownPercents = [...extractPercents(draft)].filter((p) => !sourceNumbers.has(p));
   if (unknownPercents.length > 0) {
     warnings.push(`요강에서 못 찾은 비율: ${unknownPercents.map((p) => p + '%').join(', ')}`);
   }
 
-  const sourceCounts = extractHeadcounts(sourceText);
-  const unknownCounts = [...extractHeadcounts(draft)].filter((c) => !sourceCounts.has(c));
+  const unknownCounts = [...extractHeadcounts(draft)].filter((c) => !sourceNumbers.has(c));
   if (unknownCounts.length > 0) {
     warnings.push(`요강에서 못 찾은 인원: ${unknownCounts.map((c) => c + '명').join(', ')}`);
   }
