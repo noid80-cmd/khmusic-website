@@ -34,7 +34,7 @@ const DraftSchema = z.object({
 export type BlogDraft = z.infer<typeof DraftSchema>;
 
 const SYSTEM = `당신은 실용음악 입시 정보를 정리해 주는 사람입니다.
-독자는 실용음악과 진학을 준비하는 고등학생과 학부모입니다.
+독자는 실용음악과 진학을 준비하는 고등학생과 학부모, 그리고 예술고등학교 진학을 준비하는 중학생과 학부모입니다. 이번에 다룰 요강이 어느 쪽인지 보고 그 독자에게 맞춰 씁니다.
 
 이 글의 목적은 하나입니다: 요강을 읽어도 알기 어려운 부분을 풀어 주고, 그래서 무엇을 어떻게 준비하면 되는지 알려주는 것.
 
@@ -57,6 +57,13 @@ const SYSTEM = `당신은 실용음악 입시 정보를 정리해 주는 사람�
 - 정해진 정답을 따라하는 것보다 지원자의 개성과 강점이 드러나는 쪽이 유리합니다.
 - 준비를 일찍 시작할수록 학업과 병행할 여유가 생기고, 늦을수록 선택과 집중이 필요해집니다.
 - 졸업 후 진로는 가수·밴드·싱어송라이터·작곡·편곡·프로듀서·세션·영화음악·방송음악·뮤지컬·게임음악·사운드엔지니어·교육 등으로 넓습니다. 연주자만 되는 학과가 아닙니다.
+
+예술고등학교(예고) 요강을 다룰 때 추가로 지킬 것:
+- 독자가 다릅니다. 중학생과 그 학부모가 읽습니다. 대학 입시 용어를 설명 없이 쓰지 마세요.
+- 예고는 진학이 끝이 아니라 시작입니다. 합격 자체보다 입학 후 3년을 어떻게 쓰게 되는지가 학생·학부모의 실제 관심사입니다.
+- 실기 준비 기간이 대학 입시보다 짧고 시작 시점이 이릅니다. 언제부터 무엇을 준비해야 하는지가 특히 중요합니다.
+- 예고에 가지 않으면 실용음악과에 못 간다는 식의 인상을 주지 마세요. 사실이 아닙니다. 선택지 중 하나로 다룹니다.
+- 학비·통학·기숙 여부처럼 중학생 가정이 실제로 따지는 조건은 자료에 있을 때만 씁니다. 없으면 "학교 공식 발표에서 확인하라"고만 씁니다.
 
 글의 구조 (기존 글의 결을 따르세요):
 1. 도입 - 어떤 요강이 나왔는지, 어디서 학생들이 걸리는지 두세 문장
@@ -88,9 +95,22 @@ function todayKST(): string {
   }).format(new Date());
 }
 
+/**
+ * 지금 진행 중인 입시의 학년도.
+ *
+ * 2026년 9월에 접수하는 건 2027학년도 수시다. 달력 연도로 거르면 이미 끝난
+ * 작년 요강이 후보로 남아서, 원서 마감이 지난 전형을 두고 "준비하세요"라는
+ * 글이 나간다. 3월을 기준으로 다음 학년도로 넘긴다(1~2월은 정시가 아직 진행 중).
+ */
+function currentAdmissionYear(at = new Date()): number {
+  const kst = new Date(at.getTime() + 9 * 60 * 60 * 1000);
+  const year = kst.getUTCFullYear();
+  return kst.getUTCMonth() + 1 >= 3 ? year + 1 : year;
+}
+
 /** 모델에 넘길 근거 자료를 DB에서 모은다. */
 async function gatherContext() {
-  const thisYear = new Date().getFullYear();
+  const thisYear = currentAdmissionYear();
 
   const [guides, recentPosts] = await Promise.all([
     // take로 자르면 안 된다. order 값이 전부 0이라 잘린 12개가 사실상 입력 순서로
@@ -124,10 +144,21 @@ const POPULAR_UNIVERSITIES = [
   ['정화예술대학교'], // 최근 지원 문의가 늘고 있는 학교
 ];
 
+/** 예고는 이 둘이 두드러지고 나머지는 비슷한 수준이라 한 줄로만 나눈다. */
+const POPULAR_ARTS_HIGH_SCHOOLS = ['서울공연예술고등학교', '한림연예예술고등학교'];
+
+/** 예고 요강인지. 대학 글과 독자도 시점도 달라서 갈라서 다뤄야 한다. */
+function isArtsHighSchool(name: string): boolean {
+  return name.includes('고등학교');
+}
+
 /** 인기 순위. 목록에 없으면 맨 뒤(=목록 길이)로 보낸다. */
-function popularityRank(university: string): number {
+function popularityRank(name: string): number {
+  if (isArtsHighSchool(name)) {
+    return POPULAR_ARTS_HIGH_SCHOOLS.some((s) => name.includes(s)) ? 0 : 1;
+  }
   const tier = POPULAR_UNIVERSITIES.findIndex((names) =>
-    names.some((name) => university.includes(name)),
+    names.some((n) => name.includes(n)),
   );
   return tier === -1 ? POPULAR_UNIVERSITIES.length : tier;
 }
@@ -157,16 +188,33 @@ function universityAliases(university: string): string[] {
  */
 function pickGuide<T extends { university: string }>(guides: T[], recentTitles: string[]): T | null {
   if (guides.length === 0) return null;
-  const scored = guides.map((g) => {
-    const aliases = universityAliases(g.university);
-    return {
-      guide: g,
-      used: recentTitles.filter((t) => aliases.some((a) => t.includes(a))).length,
-      rank: popularityRank(g.university),
-    };
-  });
-  scored.sort((a, b) => a.used - b.used || a.rank - b.rank);
-  return scored[0].guide;
+
+  const best = (pool: T[]): T | null => {
+    if (pool.length === 0) return null;
+    const scored = pool.map((g) => {
+      const aliases = universityAliases(g.university);
+      return {
+        guide: g,
+        used: recentTitles.filter((t) => aliases.some((a) => t.includes(a))).length,
+        rank: popularityRank(g.university),
+      };
+    });
+    scored.sort((a, b) => a.used - b.used || a.rank - b.rank);
+    return scored[0].guide;
+  };
+
+  const highSchools = guides.filter((g) => isArtsHighSchool(g.university));
+  const universities = guides.filter((g) => !isArtsHighSchool(g.university));
+
+  // 예고 요강은 대학보다 수가 훨씬 적다. 인기순으로만 줄을 세우면 대학에 밀려
+  // 사실상 안 나온다. 최근 네 편에 예고 글이 없으면 예고 차례로 넘긴다.
+  const coveredRecently = recentTitles.slice(0, 4).some((t) => /예고|예술고|음악고|고등학교/.test(t));
+  if (!coveredRecently) {
+    const pick = best(highSchools);
+    if (pick) return pick;
+  }
+
+  return best(universities) ?? best(highSchools);
 }
 
 export type DraftResult =
@@ -208,6 +256,13 @@ export async function generateBlogDraft(): Promise<DraftResult> {
 ## 오늘 날짜 (한국 시간)
 ${todayKST()}
 이 글은 오늘 발행됩니다. "언제까지 무엇을 하라"는 조언은 전부 이 날짜 이후여야 합니다.
+
+## 이번 글의 독자
+${
+  isArtsHighSchool(guide.university)
+    ? '예술고등학교 진학을 준비하는 중학생과 학부모입니다. 예고 관련 지침을 따르세요.'
+    : '실용음악과 진학을 준비하는 고등학생과 학부모입니다.'
+}
 
 ## 이번에 다룰 입시요강
 ${JSON.stringify(guide, null, 2)}
