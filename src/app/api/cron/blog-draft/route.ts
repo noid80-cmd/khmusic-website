@@ -3,8 +3,10 @@ import { generateBlogDraft } from '@/lib/blog-draft';
 import { getSession } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
-// 모델이 글 한 편을 쓰는 데 수십 초가 걸린다. 기본 상한(10초)으로는 항상 잘린다.
-export const maxDuration = 60;
+// 모델이 글 한 편을 쓰는 데 1분 안팎이 걸린다. 60초로 잡았더니 경계에 걸려
+// 어떤 날은 되고 어떤 날은 504로 죽었다. 플랜 상한을 넘기면 Vercel이 알아서
+// 낮춰 잡으므로 넉넉히 요청해 둔다.
+export const maxDuration = 300;
 
 /**
  * Vercel Cron이 부르는 자리. 주 2회 입시 칼럼 초안을 만들어 DRAFT로 넣는다.

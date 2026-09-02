@@ -169,7 +169,23 @@ export default function BlogAdminPage() {
     setGenerating(true);
     try {
       const res = await fetch('/api/cron/blog-draft', { method: 'POST' });
-      const data = await res.json();
+
+      // 생성이 1분 가까이 걸려서 종종 Vercel의 시간 제한에 걸린다. 그때 돌아오는 건
+      // JSON이 아니라 플랫폼 오류 페이지라, 바로 res.json()을 부르면 "요청 실패"라는
+      // 뭉뚱그린 메시지만 남고 원인을 알 수 없다.
+      const body = await res.text();
+      let data: { created?: boolean; title?: string; reason?: string; error?: string };
+      try {
+        data = JSON.parse(body);
+      } catch {
+        alert(
+          res.status === 504
+            ? '시간이 초과됐습니다. 글 생성이 1분 넘게 걸리면 서버가 중단시킵니다. 다시 시도해 주세요.'
+            : `서버 오류 (${res.status}). 잠시 후 다시 시도해 주세요.`,
+        );
+        return;
+      }
+
       if (data.created) {
         alert(`초안이 만들어졌습니다.
 
@@ -184,8 +200,10 @@ ${data.reason ?? data.error ?? '알 수 없는 이유'}`);
       }
     } catch {
       alert('요청이 실패했습니다. 잠시 후 다시 시도해 주세요.');
+    } finally {
+      // 위쪽에서 중간에 return하는 길이 있어서 finally가 아니면 버튼이 눌린 채 굳는다.
+      setGenerating(false);
     }
-    setGenerating(false);
   }
 
   return (
