@@ -148,17 +148,23 @@ export function pickTopic<T extends GuideLike>(
   }
 
   // 여러 요강을 가로지르는 글. 마감이 지난 요강도 비교 자료로는 유효하다.
-  for (const c of CROSSCUTS) {
-    if (usedRecently(c.theme, recentTitles)) continue;
+  //
+  // 목록 순서대로 첫 번째를 고르면 늘 같은 기획이 나온다. 초안이 마음에 안
+  // 들어 지우고 다시 만들면 같은 글을 또 만나게 된다. 쓸 수 있는 것들 중에서
+  // 고른다.
+  const crosscuts = CROSSCUTS.filter(
+    (c) => !usedRecently(c.theme, recentTitles) && guides.filter(c.pick).length >= 3,
+  );
+  if (crosscuts.length > 0) {
+    const c = crosscuts[Math.floor(Math.random() * crosscuts.length)];
     const matched = guides.filter(c.pick);
-    if (matched.length >= 3) {
-      return { kind: 'crosscut', theme: c.theme, angle: c.angle, guides: matched.slice(0, 12) };
-    }
+    return { kind: 'crosscut', theme: c.theme, angle: c.angle, guides: matched.slice(0, 12) };
   }
 
   const month = new Date(today.getTime() + 9 * 60 * 60 * 1000).getUTCMonth() + 1;
-  for (const s of SEASONAL[month] ?? []) {
-    if (usedRecently(s.theme, recentTitles)) continue;
+  const seasonal = (SEASONAL[month] ?? []).filter((s) => !usedRecently(s.theme, recentTitles));
+  if (seasonal.length > 0) {
+    const s = seasonal[Math.floor(Math.random() * seasonal.length)];
     return { kind: 'seasonal', theme: s.theme, angle: s.angle, guides: guides.slice(0, 8) };
   }
 

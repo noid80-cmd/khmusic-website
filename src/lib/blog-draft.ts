@@ -214,7 +214,15 @@ function pickGuide<T extends { university: string; department?: string | null }>
       };
     });
     scored.sort((a, b) => a.used - b.used || a.rank - b.rank || a.dept - b.dept);
-    return scored[0].guide;
+
+    // 1등만 고르면 같은 입력에서 늘 같은 글이 나온다. 초안이 마음에 안 들어
+    // 지우고 다시 만들면 방금 그 글을 또 만든다 — 지운 순간 "이미 썼다"는
+    // 기억까지 사라지기 때문에 더 그렇다.
+    //
+    // 상위 몇 개 중에서 고른다. 순서 자체는 그대로 쓴다. 완전 무작위로 하면
+    // 인기 없는 학교만 계속 나오고, 예고를 앞세우던 규칙도 무너진다.
+    const pool2 = scored.slice(0, Math.min(3, scored.length));
+    return pool2[Math.floor(Math.random() * pool2.length)].guide;
   };
 
   const highSchools = guides.filter((g) => isArtsHighSchool(g.university));
