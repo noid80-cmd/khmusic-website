@@ -9,6 +9,7 @@ const scholarships = [
     id: 'entrance',
     name: '입학장학',
     amount: '15%~50%',
+    benefit: '수강료 15%~50% 할인',
     description: '재수생 및 반수생, 예비 5번 이내 차등지급',
     color: '#ffc50a',
     criteria: ['재수생 및 반수생', '예비 5번 이내 합격자', '차등 지급'],
@@ -17,6 +18,7 @@ const scholarships = [
     id: 'merit',
     name: '성적장학',
     amount: '20%~50%',
+    benefit: '수강료 20%~50% 할인',
     description: '학기말 시험 성적 우수자 장학금',
     color: '#ffc50a',
     criteria: ['학기말 시험 1등', '학기말 시험 2등', '학기말 시험 3등'],
@@ -24,7 +26,8 @@ const scholarships = [
   {
     id: 'point',
     name: '상점장학',
-    amount: '5%~15%',
+    amount: '1~3만원',
+    benefit: '1~3만원 교육상품권 지급',
     description: '출석, 수업태도, 연습 성실도에 따른 상점 부여',
     color: '#ffc50a',
     criteria: ['출석 우수자', '수업태도 우수자', '연습 성실도 우수자'],
@@ -38,11 +41,11 @@ const gradeRankings = [
   { rank: '3등', discount: '20%', color: '#cd7f32' },
 ];
 
-// 상점장학 데이터 (5%~15%)
+// 상점장학 데이터 — 수강료 할인이 아니라 교육상품권 지급이다
 const pointRankings = [
-  { rank: '우수', discount: '15%', color: '#ffc50a' },
-  { rank: '양호', discount: '10%', color: '#c0c0c0' },
-  { rank: '보통', discount: '5%', color: '#cd7f32' },
+  { rank: '우수', discount: '3만원', color: '#ffc50a' },
+  { rank: '양호', discount: '2만원', color: '#c0c0c0' },
+  { rank: '보통', discount: '1만원', color: '#cd7f32' },
 ];
 
 const pointRules = [
@@ -125,7 +128,7 @@ export default function ScholarshipPage() {
                   fontWeight: 600,
                   marginBottom: '20px',
                 }}>
-                  수강료 {scholarship.amount} 할인
+                  {scholarship.benefit}
                 </div>
                 <h3 style={{
                   fontSize: '28px',
@@ -491,10 +494,10 @@ export default function ScholarshipPage() {
                 color: '#ffc50a',
                 marginTop: '24px',
               }}>
-                5%~15%
+                1~3만원
               </div>
               <p style={{ fontSize: '16px', color: 'rgba(255,255,255,0.5)', marginTop: '8px' }}>
-                수강료 할인
+                교육상품권 지급
               </p>
             </div>
 
@@ -539,7 +542,7 @@ export default function ScholarshipPage() {
                     {item.discount}
                   </p>
                   <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', marginTop: '4px' }}>
-                    다음달 수강료
+                    교육상품권
                   </p>
                 </div>
               ))}
@@ -612,7 +615,7 @@ export default function ScholarshipPage() {
                 </li>
                 <li style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', fontSize: '14px', color: '#444', lineHeight: 1.7 }}>
                   <span style={{ color: '#ffc50a', fontWeight: 700 }}>•</span>
-                  장학금은 다음 달 수강료에서 자동 차감됩니다.
+                  교육상품권은 다음 달 초에 지급됩니다.
                 </li>
               </ul>
             </div>

@@ -20,7 +20,7 @@ const scholarships = [
   {
     id: 'merit',
     title: '상점장학',
-    discount: '5~15%',
+    discount: '1~3만원',
     description: '출석, 수업태도, 연습 성실도에 따른 상점 부여',
     color: '#fff',
   },
